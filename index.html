@@ -52,7 +52,7 @@ tr.pop{animation:pop .45s cubic-bezier(.3,1.6,.5,1)}@keyframes pop{from{opacity:
 #receipt{display:block!important;width:48mm;margin:0 auto;padding:2mm 0 6mm;color:#000;font:11px/1.35 "Courier New",monospace}#receipt .c{text-align:center}#receipt .st{font-size:14px;font-weight:700}#receipt .hr{border-top:1px dashed #000;margin:4px 0}#receipt .ln{display:flex;justify-content:space-between;gap:6px}#receipt .tot{font-size:14px;font-weight:700}}
 </style></head><body>
 <header><h1><span class="logo">🏪</span> DEV GENERAL STORE</h1><span id="pending" style="font-size:12px"></span><button class="hb" id="alertChip"></button>
-<select id="lang" class="hb"><option value="en-IN">English / Hinglish</option><option value="hi-IN">हिन्दी</option></select><button class="hb" id="snd">🔊 Meme: Full</button><button class="hb" id="mic">🎤 Voice: OFF</button><span id="badge">Online</span></header>
+<select id="lang" class="hb"><option value="en-IN">English / Hinglish</option><option value="hi-IN">हिन्दी</option></select><button class="hb" id="pack">🇮🇳 Desi memes</button><button class="hb" id="snd">🔊 Meme: Full</button><button class="hb" id="mic">🎤 Voice: OFF</button><span id="badge">Online</span></header>
 <nav><button data-t="pos" class="a">🧾 POS</button><button data-t="stock">📦 Stock</button><button data-t="udh">📒 Udhaar</button></nav>
 <div id="vbar"><span id="vs">Voice off. Tap 🎤 or press F4. Speak clearly and say: "Classic Milds 2", "cash", "discount 10", "bill", "open stock", "open udhaar", "remind Ramesh".</span> <b id="vh"></b></div>
 
@@ -318,12 +318,32 @@ var SY={
  imp:function(){for(var i=0;i<12;i++)tone(170-i*6,.09,i*.055,'sine',.55,70);tone(1047,.4,.8,'sawtooth',.15)}};
 SY.stockin=SY.cash;
 var PH={cash:'वाह भाई वाह!',upi:'अरे वाह!',khata:'हाय हाय! उधार!',jama:'शाबाश!',low:'अरे बाप रे! माल खत्म होने वाला है!',exp:'अरे ये तो एक्सपायर हो गया!',err:'ये क्या बात हुई!',disc:'थोड़ा डिस्काउंट मिल गया!',imp:'जुगाड़ हो गया!',wa:'याद दिलाओ, याद दिलाओ!',stockin:'माल आ गया!'};
-function synth(n,q){try{(SY[n]||SY.add)()}catch(e){}
- if(sm=='full'&&!q&&!von&&PH[n]&&window.speechSynthesis){var u=new SpeechSynthesisUtterance(PH[n]);u.lang='hi-IN';u.rate=1.05;u.pitch=1.25;setTimeout(function(){try{speechSynthesis.speak(u)}catch(e){}},n=='khata'||n=='jama'?1100:350)}}
+var pack=localStorage.getItem('pos_pack')||'desi';
+function boom(t){tone(130,.7,t||0,'sine',.9,38);nz(.18,t||0,.7,300,60)}
+function horn(t){[440,554,659].forEach(function(f){tone(f,.2,t,'sawtooth',.13);tone(f*1.01,.2,t,'sawtooth',.1)})}
+var SY2={
+ add:function(){tone(320,.09,0,'sine',.55,110);tone(1000,.04,0,'square',.08)},
+ del:function(){nz(.3,0,.8,3500,400)},
+ tab:function(){nz(.2,0,.3,500,3000)},
+ cash:function(){horn(0);horn(.25);horn(.5)},
+ upi:function(){tone(1760,.25,0,'sine',.3);tone(1760,.5,.2,'sine',.3);tone(2349,.5,.2,'sine',.15)},
+ khata:function(){tone(587,.6,0,'triangle',.28,523);tone(523,.6,.65,'triangle',.28,466);tone(440,1.3,1.3,'triangle',.28,330)},
+ jama:function(){boom(0);horn(.35);boom(.9)},
+ low:function(){[0,.45,.9].forEach(function(t){tone(98,.35,t,'sawtooth',.3,70)})},
+ exp:function(){tone(420,1,0,'sawtooth',.22,55)},
+ err:function(){tone(150,.4,0,'sawtooth',.35,85);boom(.05)},
+ disc:function(){tone(300,.45,0,'sine',.3,1300)},
+ wa:function(){tone(1200,.08,0,'sine',.3);tone(1600,.12,.1,'sine',.3)},
+ imp:function(){boom(0);horn(.3);boom(.8)}};
+SY2.stockin=SY2.upi;
+var PH2={cash:'Very beautiful!',upi:'Very beautiful! Very nice!',khata:'Emotional damage!',jama:"Very beautiful! Let's gooo!",low:'Emotional damage! Stock is almost over.',exp:'Emotional damage! This expired.',err:'Bruh.',disc:'Wow, discount!',imp:'Boom! Done!',wa:'Message sent!',stockin:'Very beautiful, fresh stock!'};
+function synth(n,q){var ins=pack=='insta'||(pack=='mix'&&Math.random()<.5);try{((ins?SY2:SY)[n]||SY.add)()}catch(e){}
+ var tx=(ins?PH2:PH)[n];if(sm=='full'&&!q&&!von&&tx&&window.speechSynthesis){var u=new SpeechSynthesisUtterance(tx);u.lang=ins?'en-IN':'hi-IN';u.rate=1.05;u.pitch=ins?.9:1.25;if(/Emotional/.test(tx)){u.pitch=.6;u.rate=.85}else if(/beautiful/.test(tx)){u.pitch=1.15;u.rate=.92}setTimeout(function(){try{speechSynthesis.speak(u)}catch(e){}},n=='khata'?2300:n=='jama'?1100:350)}}
 function fun(n,q){if(sm=='off')return;
  if(!miss[n]){var a=new Audio('sounds/'+n+'.mp3');a.onerror=function(){miss[n]=1;synth(n,q)};var pr=a.play();if(pr&&pr.catch)pr.catch(function(){});return}
  synth(n,q)}
-function sndLbl(){$('snd').textContent=sm=='full'?'🔊 Meme: Full':sm=='sfx'?'🔉 Sounds only':'🔇 Silent'}
+function sndLbl(){$('pack').textContent=pack=='desi'?'🇮🇳 Desi memes':pack=='insta'?'📱 Insta memes':'🎲 Mix memes';$('snd').textContent=sm=='full'?'🔊 Meme: Full':sm=='sfx'?'🔉 Sounds only':'🔇 Silent'}
+$('pack').onclick=function(){pack=pack=='desi'?'insta':pack=='insta'?'mix':'desi';localStorage.setItem('pos_pack',pack);sndLbl();fun('cash')};
 $('snd').onclick=function(){sm=sm=='full'?'sfx':sm=='sfx'?'off':'full';localStorage.setItem('pos_snd',sm);sndLbl();fun('cash')};
 document.addEventListener('click',function(){try{ac()}catch(e){}},{once:true});
 

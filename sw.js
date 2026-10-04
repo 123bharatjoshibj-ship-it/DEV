@@ -1,5 +1,5 @@
 // Network-first. Bump VERSION on every deploy to drop old caches.
-const VERSION = 'v4';
+const VERSION = 'v6';
 const CACHE = 'dev-pos-' + VERSION;
 const CORE = ['./', './index.html', './manifest.json'];
 const CDN = ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net'];
