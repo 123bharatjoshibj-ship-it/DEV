@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dev General Store POS</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f766e">
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f1f5f9;color:#0f172a}
+header{background:#0f766e;color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px}
+header h1{font-size:18px;margin:0;flex:1}
+#badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:#16a34a}
+#badge.off{background:#dc2626}
+.counters{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:10px 16px}
+.card{background:#fff;border-radius:10px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.card small{color:#64748b;font-size:12px;display:block}
+.card b{font-size:20px}
+main{display:grid;grid-template-columns:1.1fr 1fr;gap:12px;padding:0 16px 16px}
+.panel{background:#fff;border-radius:10px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.sw{position:relative}
+#search{width:100%;font-size:18px;padding:12px;border:2px solid #0f766e;border-radius:8px;outline:none}
+#dd{position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid #cbd5e1;border-radius:8px;margin-top:4px;max-height:300px;overflow:auto;z-index:10;display:none;box-shadow:0 8px 24px rgba(0,0,0,.15)}
+#dd div{padding:10px 12px;display:flex;justify-content:space-between;cursor:pointer;border-bottom:1px solid #f1f5f9}
+#dd div.hi,#dd div:hover{background:#ccfbf1}
+.hint{font-size:12px;color:#64748b;margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:12px;color:#64748b;border-bottom:1px solid #e2e8f0;padding:6px 4px}
+td{padding:8px 4px;border-bottom:1px solid #f1f5f9}
+.r{text-align:right}
+.q button{width:26px;height:26px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer}
+.x{border:none;background:none;color:#dc2626;cursor:pointer;font-size:18px}
+.total{display:flex;justify-content:space-between;font-size:26px;font-weight:800;margin:6px 0 10px}
+.pay{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.pay label{border:2px solid #cbd5e1;border-radius:8px;padding:10px 6px;text-align:center;cursor:pointer;font-size:13px;font-weight:600}
+.pay label.sel{border-color:#0f766e;background:#ccfbf1}
+.pay input{display:none}
+.inp{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;margin-bottom:8px}
+.btn{width:100%;padding:12px;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;background:#0f766e;color:#fff;margin-top:6px}
+.btn.sec{background:#e2e8f0;color:#0f172a}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 18px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.show{opacity:1}
+@media(max-width:820px){.counters{grid-template-columns:repeat(2,1fr)}main{grid-template-columns:1fr}}
+
+#receipt{display:none}
+@media print{
+  @page{size:58mm auto;margin:0}
+  html,body{background:#fff!important;margin:0!important;padding:0!important}
+  body>*:not(#receipt){display:none!important}
+  #receipt{display:block!important;width:48mm;margin:0 auto;padding:2mm 0 6mm;color:#000;font:11px/1.35 "Courier New",monospace}
+  #receipt .c{text-align:center}
+  #receipt .store{font-size:14px;font-weight:700}
+  #receipt .hr{border-top:1px dashed #000;margin:4px 0}
+  #receipt .ln{display:flex;justify-content:space-between;gap:6px}
+  #receipt .tot{font-size:14px;font-weight:700}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>DEV GENERAL STORE</h1>
+  <span id="pending" style="font-size:12px"></span>
+  <span id="badge">Online</span>
+</header>
+
+<section class="counters">
+  <div class="card"><small>Today's Sales</small><b id="cTotal">₹0.00</b></div>
+  <div class="card"><small>Paytm UPI</small><b id="cUpi">₹0.00</b></div>
+  <div class="card"><small>Cash</small><b id="cCash">₹0.00</b></div>
+  <div class="card"><small>Khata</small><b id="cKhata">₹0.00</b></div>
+</section>
+
+<main>
+  <section class="panel">
+    <div class="sw">
+      <input id="search" autocomplete="off" autofocus placeholder="Scan barcode / type SKU or product name…">
+      <div id="dd"></div>
+    </div>
+    <div class="hint">Enter = add • ↑ ↓ = choose • Ctrl+Enter = complete &amp; print • F2 = focus search</div>
+    <table>
+      <thead><tr><th>Item</th><th class="r">Price</th><th>Qty</th><th class="r">Amount</th><th></th></tr></thead>
+      <tbody id="cart"></tbody>
+    </table>
+  </section>
+
+  <section class="panel">
+    <div class="total"><span>Total</span><span id="grand">₹0.00</span></div>
+    <div class="pay" id="pay">
+      <label data-m="UPI" class="sel"><input type="radio" name="pm" checked>UPI (Paytm Soundbox / QR)</label>
+      <label data-m="CASH"><input type="radio" name="pm">Cash</label>
+      <label data-m="KHATA"><input type="radio" name="pm">Customer Credit / Khata</label>
+    </div>
+    <div class="hint" id="payHint"></div>
+    <input id="cust" class="inp" placeholder="Customer name (required for Khata)">
+    <button class="btn" id="bPrint">Complete &amp; Print (Ctrl+Enter)</button>
+    <button class="btn sec" id="bNoPrint">Complete without print</button>
+    <button class="btn sec" id="bClear">Clear cart</button>
+    <button class="btn sec" id="bReprint">Reprint last receipt</button>
+  </section>
+</main>
+
+<div id="receipt"></div>
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/3.2.7/dexie.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  var SUPABASE_URL = 'https://wgkhifgfyajvswppwfti.supabase.co';
+  var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indna2hpZmdmeWFqdnN3cHB3ZnRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwODI4NDksImV4cCI6MjEwNjY1ODg0OX0.O9urdfTtqmHUaz2lPxx4-AaHZLnzKNKCj3GOZwx-qG8';
+  var STORE = 'DEV GENERAL STORE';
+
+  // Single client, declared once (the library global is window.supabase, so we use "sb")
+  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  var db = new Dexie('dev_pos');
+  db.version(1).stores({ products: 'id,sku,name', sales: 'id,invoice_no,created_at,synced' });
+
+  var $ = function (id) { return document.getElementById(id); };
+  var products = [], results = [], hi = 0, cart = [], payMode = 'UPI', lastSale = null, syncing = false, busy = false;
+
+  function pad(n, w) { n = String(n); while (n.length < w) n = '0' + n; return n; }
+  function r2(n) { return Math.round(n * 100) / 100; }
+  function money(n) { return '₹' + Number(n || 0).toFixed(2); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function uuid() { return (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) { var r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); })); }
+  var tt;
+  function toast(m) { var t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(function () { t.classList.remove('show'); }, 2600); }
+
+  /* ---------- Online badge ---------- */
+  function setBadge() { var on = navigator.onLine; $('badge').textContent = on ? 'Online' : 'Offline'; $('badge').className = on ? '' : 'off'; }
+  async function showPending() {
+    var n = await db.sales.where('synced').equals(0).count();
+    $('pending').textContent = n ? n + ' bill(s) waiting to sync' : '';
+  }
+
+  /* ---------- Two-way sync ---------- */
+  async function sync() {
+    if (!navigator.onLine || syncing) return;
+    syncing = true;
+    try {
+      var pend = await db.sales.where('synced').equals(0).toArray();
+      if (pend.length) {
+        var rows = pend.map(function (s) { var c = Object.assign({}, s); delete c.synced; return c; });
+        var up = await sb.from('sales').upsert(rows, { onConflict: 'id' });
+        if (up.error) throw up.error;
+        await db.sales.bulkPut(pend.map(function (s) { return Object.assign({}, s, { synced: 1 }); }));
+      }
+      var down = await sb.from('products').select('id,sku,name,price');
+      if (down.error) throw down.error;
+      await db.transaction('rw', db.products, async function () {
+        await db.products.clear();
+        await db.products.bulkPut(down.data.map(function (p) { return { id: p.id, sku: p.sku, name: p.name, price: Number(p.price) }; }));
+      });
+      await loadProducts();
+    } catch (e) { console.error('sync failed', e); }
+    finally { syncing = false; showPending(); }
+  }
+  async function loadProducts() {
+    products = (await db.products.toArray()).sort(function (a, b) { return a.name.localeCompare(b.name); });
+  }
+
+  /* ---------- Counters (from local data, instant) ---------- */
+  async function counters() {
+    var d = new Date(); d.setHours(0, 0, 0, 0);
+    var rows = await db.sales.where('created_at').aboveOrEqual(d.toISOString()).toArray();
+    var t = 0, u = 0, c = 0, k = 0;
+    rows.forEach(function (s) {
+      var v = Number(s.total) || 0; t += v;
+      if (s.payment_mode === 'UPI') u += v; else if (s.payment_mode === 'CASH') c += v; else k += v;
+    });
+    $('cTotal').textContent = money(t); $('cUpi').textContent = money(u); $('cCash').textContent = money(c); $('cKhata').textContent = money(k);
+  }
+
+  /* ---------- Search ---------- */
+  function renderDD() {
+    var dd = $('dd');
+    if (!results.length) { dd.style.display = 'none'; return; }
+    dd.innerHTML = results.map(function (p, i) {
+      return '<div data-i="' + i + '" class="' + (i === hi ? 'hi' : '') + '"><span>' + esc(p.name) + ' <small style="color:#64748b">' + esc(p.sku) + '</small></span><b>' + money(p.price) + '</b></div>';
+    }).join('');
+    dd.style.display = 'block';
+  }
+  function runSearch() {
+    var q = $('search').value.trim().toLowerCase();
+    results = q ? products.filter(function (p) { return p.sku.toLowerCase().indexOf(q) > -1 || p.name.toLowerCase().indexOf(q) > -1; }).slice(0, 8) : [];
+    hi = 0; renderDD();
+  }
+  function resetSearch() { $('search').value = ''; results = []; renderDD(); $('search').focus(); }
+
+  /* ---------- Cart ---------- */
+  function add(p) {
+    var l = cart.find(function (x) { return x.id === p.id; });
+    if (l) l.qty += 1; else cart.push({ id: p.id, sku: p.sku, name: p.name, price: Number(p.price), qty: 1 });
+    renderCart();
+  }
+  function total() { return r2(cart.reduce(function (s, l) { return s + l.price * l.qty; }, 0)); }
+  function renderCart() {
+    $('cart').innerHTML = cart.length ? cart.map(function (l, i) {
+      return '<tr><td>' + esc(l.name) + '</td><td class="r">' + money(l.price) + '</td>' +
+        '<td class="q"><button data-a="dec" data-i="' + i + '">−</button> ' + l.qty + ' <button data-a="inc" data-i="' + i + '">+</button></td>' +
+        '<td class="r">' + money(l.price * l.qty) + '</td><td><button class="x" data-a="del" data-i="' + i + '">×</button></td></tr>';
+    }).join('') : '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:28px">Cart is empty</td></tr>';
+    $('grand').textContent = money(total());
+  }
+  $('cart').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-a]'); if (!b) return;
+    var i = +b.dataset.i, a = b.dataset.a;
+    if (!cart[i]) return;
+    if (a === 'inc') cart[i].qty++;
+    if (a === 'dec' && --cart[i].qty <= 0) cart.splice(i, 1);
+    if (a === 'del') cart.splice(i, 1);
+    renderCart(); $('search').focus();
+  });
+
+  /* ---------- Payment mode ---------- */
+  function setMode(m) {
+    payMode = m;
+    document.querySelectorAll('#pay label').forEach(function (l) { l.classList.toggle('sel', l.dataset.m === m); });
+    $('payHint').textContent = m === 'UPI' ? 'Complete the sale after you hear the Paytm Soundbox voice confirmation.' :
+      m === 'CASH' ? 'Collect cash, then complete the sale.' : 'Enter the customer name. The amount is recorded as credit.';
+    if (m === 'KHATA') $('cust').focus();
+  }
+  $('pay').addEventListener('click', function (e) { var l = e.target.closest('label[data-m]'); if (l) { e.preventDefault(); setMode(l.dataset.m); } });
+
+  /* ---------- Sale ---------- */
+  async function nextInvoice() {
+    var d = new Date(), prefix = 'INV-' + pad(d.getFullYear() % 100, 2) + pad(d.getMonth() + 1, 2) + pad(d.getDate(), 2) + '-';
+    var rows = await db.sales.where('invoice_no').startsWith(prefix).toArray(), max = 0;
+    rows.forEach(function (s) { var n = parseInt(s.invoice_no.slice(prefix.length), 10); if (n > max) max = n; });
+    return prefix + pad(max + 1, 4);
+  }
+  async function complete(print) {
+    if (busy) return;
+    if (!cart.length) { toast('Cart is empty'); return; }
+    var cust = $('cust').value.trim();
+    if (payMode === 'KHATA' && !cust) { toast('Enter customer name for Khata'); $('cust').focus(); return; }
+    busy = true;
+    try {
+      var sale = {
+        id: uuid(), invoice_no: await nextInvoice(),
+        items: cart.map(function (l) { return { sku: l.sku, name: l.name, price: l.price, qty: l.qty }; }),
+        total: total(), payment_mode: payMode, customer_name: cust || null,
+        created_at: new Date().toISOString(), synced: 0
+      };
+      await db.sales.put(sale);
+      lastSale = sale; cart = []; $('cust').value = ''; setMode('UPI');
+      renderCart(); await counters(); await showPending();
+      toast('Sale ' + sale.invoice_no + ' saved');
+      if (print) printReceipt(sale);
+      resetSearch();
+      sync();
+    } catch (e) { console.error(e); toast('Could not save: ' + e.message); }
+    finally { busy = false; }
+  }
+
+  /* ---------- 58mm receipt ---------- */
+  function printReceipt(s) {
+    if (!s) { toast('No sale to print'); return; }
+    var d = new Date(s.created_at);
+    var when = pad(d.getDate(), 2) + '/' + pad(d.getMonth() + 1, 2) + '/' + d.getFullYear() + ' ' + pad(d.getHours(), 2) + ':' + pad(d.getMinutes(), 2);
+    var mode = s.payment_mode === 'UPI' ? 'UPI (Paytm)' : s.payment_mode === 'CASH' ? 'Cash' : 'Khata (Credit)';
+    var h = '<div class="c store">' + esc(STORE) + '</div><div class="hr"></div>' +
+      '<div>Inv: ' + esc(s.invoice_no) + '</div><div>' + when + '</div>' +
+      (s.customer_name ? '<div>Cust: ' + esc(s.customer_name) + '</div>' : '') + '<div class="hr"></div>';
+    s.items.forEach(function (it) {
+      h += '<div>' + esc(it.name) + '</div><div class="ln"><span>' + it.qty + ' x ' + Number(it.price).toFixed(2) + '</span><span>' + r2(it.qty * it.price).toFixed(2) + '</span></div>';
+    });
+    h += '<div class="hr"></div><div class="ln tot"><span>TOTAL</span><span>Rs.' + Number(s.total).toFixed(2) + '</span></div>' +
+      '<div>Paid via: ' + mode + '</div><div class="hr"></div><div class="c">Thank you! Visit again</div>';
+    $('receipt').innerHTML = h;
+    setTimeout(function () { window.print(); }, 80);
+  }
+
+  /* ---------- Events ---------- */
+  $('search').addEventListener('input', runSearch);
+  $('search').addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); if (results.length) { hi = (hi + 1) % results.length; renderDD(); } }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); if (results.length) { hi = (hi - 1 + results.length) % results.length; renderDD(); } }
+    else if (e.key === 'Escape') resetSearch();
+    else if (e.key === 'Enter' && !(e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      var q = $('search').value.trim().toLowerCase(); if (!q) return;
+      var exact = products.find(function (p) { return p.sku.toLowerCase() === q; });
+      var pick = exact || results[hi];
+      if (pick) { add(pick); resetSearch(); } else toast('No product found');
+    }
+  });
+  $('dd').addEventListener('mousedown', function (e) {
+    var row = e.target.closest('div[data-i]'); if (!row) return;
+    e.preventDefault(); add(results[+row.dataset.i]); resetSearch();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); complete(true); }
+    else if (e.key === 'F2') { e.preventDefault(); $('search').focus(); }
+  });
+  $('bPrint').onclick = function () { complete(true); };
+  $('bNoPrint').onclick = function () { complete(false); };
+  $('bClear').onclick = function () { cart = []; renderCart(); resetSearch(); };
+  $('bReprint').onclick = function () { printReceipt(lastSale); };
+  window.addEventListener('online', function () { setBadge(); sync(); });
+  window.addEventListener('offline', setBadge);
+
+  /* ---------- Boot ---------- */
+  (async function () {
+    setBadge(); setMode('UPI'); renderCart();
+    await loadProducts();
+    var l = await db.sales.orderBy('created_at').last(); if (l) lastSale = l;
+    await counters(); await showPending();
+    sync(); setInterval(sync, 30000);
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+    $('search').focus();
+  })();
+})();
+</script>
+</body>
+</html>
